@@ -6,7 +6,9 @@ const app = new Hono();
 app.get("/", async (c) => {
 });
 
-app.post("/api/v1/meal-planner", async (c) => {});
+app.post("/api/v1/meal-planner/webhooks", async (c) => {
+  
+});
 
 export default {
   fetch: app.fetch,
