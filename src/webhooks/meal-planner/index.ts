@@ -1,32 +1,27 @@
 import { Context } from "hono";
-import { PopulateWebhookEventType } from "./types";
-import { validateWebhook, verifyWebhook } from "./utils";
+import { getWebhookEventType, verifyWebhook } from "./utils";
 
-async function handlePopulateWebhookEvent(event: PopulateWebhookEventType) {}
+async function handlePopulateWebhookEvent() {}
 
 export async function handle(c: Context) {
+  console.log("Received webhook event");
+
   const isVerified = await verifyWebhook(c);
   if (!isVerified) {
     return c.text("Unauthorized", 401);
   }
 
-  const body = await c.req.json();
-  const event = await validateWebhook(body);
-  if (!event) {
-    return c.json({ error: "Invalid payload shape" }, 400);
-  }
-
-  console.log("Received webhook event", JSON.stringify(event));
+  const webhookEventType = getWebhookEventType(c);
 
   c.executionCtx.waitUntil(
     (async () => {
       try {
-        switch (event.type) {
+        switch (webhookEventType) {
           case "populate":
-            await handlePopulateWebhookEvent(event);
+            await handlePopulateWebhookEvent();
             break;
           default:
-            console.log("Unknown event type", event.type);
+            console.log("Unknown event type", webhookEventType);
         }
       } catch (error) {
         console.error(

@@ -6,7 +6,6 @@ const BaseMealPlannerWebhookEvent = z.object({
 
 export const PopulateWebhookEvent = BaseMealPlannerWebhookEvent.extend({
   type: z.literal("populate"),
-  data: z.object({}),
 });
 
 export type PopulateWebhookEventType = z.infer<typeof PopulateWebhookEvent>;
