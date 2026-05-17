@@ -1,14 +1,19 @@
 import z from "zod";
 
 const BaseMealPlannerWebhookEvent = z.object({
-  submittedAt: z.coerce.date(), 
+  submittedAt: z.coerce.date(),
 });
 
 export const PopulateWebhookEvent = BaseMealPlannerWebhookEvent.extend({
   type: z.literal("populate"),
-  data: z.object({
-    force: z.boolean().default(false)
-  })
+  data: z.object({}),
 });
 
-export const MealPlannerWebhookEvent = z.discriminatedUnion("type", [PopulateWebhookEvent])
+export type PopulateWebhookEventType = z.infer<typeof PopulateWebhookEvent>;
+
+export const MealPlannerWebhookEvent = z.discriminatedUnion("type", [
+  PopulateWebhookEvent,
+]);
+export type MealPlannerWebhookEventType = z.infer<
+  typeof MealPlannerWebhookEvent
+>;
