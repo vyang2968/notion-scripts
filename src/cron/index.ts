@@ -10,14 +10,5 @@ export async function scheduled(
   ctx: ExecutionContext,
 ) {
   console.log(`Cron triggered at: ${new Date().toISOString()}`);
-
-  switch (event.cron) {
-    case "*/5 * * * *":
-      await reportHealth(env);
-      return ;
-    case "":
-      return ;
-    default:
-      return ;
-  }
+  ctx.waitUntil(reportHealth(env));
 }
