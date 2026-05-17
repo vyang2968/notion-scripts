@@ -5,11 +5,19 @@ import type {
 import { reportHealth } from "./handlers";
 
 export async function scheduled(
-  controller: ScheduledController,
+  event: ScheduledController,
   env: { NOTION_API_KEY: string },
   ctx: ExecutionContext,
 ) {
   console.log(`Cron triggered at: ${new Date().toISOString()}`);
 
-  ctx.waitUntil(reportHealth(env));
+  switch (event.cron) {
+    case "*/5 * * * *":
+      await reportHealth(env);
+      return ;
+    case "":
+      return ;
+    default:
+      return ;
+  }
 }

@@ -1,4 +1,3 @@
-import { Context } from "hono";
 import { EnvBindings, getNotion } from "../lib/notion";
 import { HEALTHCHECK_PARENT_BLOCK_ID } from "../webhooks/meal-planner/constants";
 import { BlockObjectResponse } from "@notionhq/client";
@@ -48,4 +47,10 @@ export async function reportHealth(env: EnvBindings) {
       },
     }),
   ]);
+}
+
+export async function populateMealPlan(env: EnvBindings) {
+  const notion = getNotion(env);
+
+  console.log("populating meal plan");
 }
