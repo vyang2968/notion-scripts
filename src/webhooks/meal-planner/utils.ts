@@ -7,10 +7,8 @@ export function getWebhookEventType(c: Context) {
 
 export async function verifyWebhook(c: Context) {
   const authHeader = c.req.header("Authorization");
-  console.log(authHeader);
 
   const expectedToken = `Bearer ${c.env.NOTION_WEBHOOK_SECRET}`;
-  console.log(expectedToken);
 
   if (!authHeader || authHeader !== expectedToken) {
     return false;
