@@ -1,3 +1,16 @@
+export type AiChatResponse = {
+  response?: string;
+  choices?: {
+    message?: {
+      content?: string;
+    };
+  }[];
+  usage?: {
+    prompt_tokens?: number;
+    completion_tokens?: number;
+  };
+};
+
 const STATUSES = [
   "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected",
 ] as const;

@@ -10,7 +10,8 @@ app.get("/", async (c) => {});
 app.post("/api/v1/meal-planner/webhooks", handle);
 
 app.get("/api/v1/test/ai", async (c) => {
-  const result = await testAiExtraction(c.env);
+  const waitUntil = c.executionCtx.waitUntil.bind(c.executionCtx);
+  const result = await testAiExtraction(c.env, waitUntil);
   return c.json(result);
 });
 

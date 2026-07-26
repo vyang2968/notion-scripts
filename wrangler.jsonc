@@ -24,9 +24,11 @@
   "compatibility_flags": [
     "nodejs_compat"
   ],
-  // "vars": {
-  //   "MY_VAR": "my-variable"
-  // },
+  "vars": {
+    "POSTHOG_HOST": "https://us.i.posthog.com",
+  },
+  // secrets (set via `wrangler secret put`):
+  //   POSTHOG_API_KEY
   // "kv_namespaces": [
   //   {
   //     "binding": "MY_KV_NAMESPACE",
