@@ -3,9 +3,9 @@ import type { ForwardableEmailMessage, ExecutionContext } from "@cloudflare/work
 import type { Address } from "postal-mime";
 import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
-import { initLoggerProvider, getLogger } from "../otel-logger";
 import { getNotion } from "../lib/notion";
 import { syncJobApplication } from "../lib/job-applications";
+import { OtelLogger } from "../otel-logger";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
@@ -15,8 +15,7 @@ const fromToString = (from: Address | undefined): string => {
   return from.name ? `${from.name} <${from.address}>` : from.address || "";
 };
 
-async function extract(bodyText: string, subject: string, from: string, env: any, posthog?: PostHog | null) {
-  const logger = getLogger();
+async function extract(bodyText: string, subject: string, from: string, env: any, posthog?: PostHog | null, logger?: OtelLogger | null) {
   const traceId = crypto.randomUUID();
   const spanId = crypto.randomUUID();
   const prompt = buildPrompt(bodyText, subject, from);
@@ -28,8 +27,7 @@ async function extract(bodyText: string, subject: string, from: string, env: any
     { role: "user", content: prompt },
   ];
 
-  logger.emit({ severityText: "info", body: "Sending to model", attributes: { tag: "ai", model: GEMINI_MODEL, promptLength: prompt.length } });
-  console.log("[ai] Sending to model", { model: GEMINI_MODEL, promptLength: prompt.length, bodyPreview: bodyText.slice(0, 200) });
+  logger?.info("[ai] Sending to model", { model: GEMINI_MODEL, promptLength: prompt.length, bodyPreview: bodyText.slice(0, 200) });
 
   const startTime = performance.now();
   let result: unknown;
@@ -63,8 +61,7 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   const aiResponse = result as AiChatResponse;
   const aiChoice = aiResponse.choices?.[0];
   const raw = aiResponse.response ?? aiChoice?.message?.content;
-  logger.emit({ severityText: "info", body: "Raw response", attributes: { tag: "ai", type: typeof raw, preview: raw?.slice?.(0, 300) } });
-  console.log("[ai] Raw response:", typeof raw, raw?.slice?.(0, 300));
+  logger?.info("[ai] Raw response", { type: typeof raw, preview: raw?.slice?.(0, 300) });
 
   if (posthog) {
     const usage = aiResponse.usage;
@@ -93,7 +90,6 @@ async function extract(bodyText: string, subject: string, from: string, env: any
 
 export async function testAiExtraction(env: any, waitUntil?: (p: Promise<any>) => void): Promise<{ success: boolean; result: ExtractionResult }> {
   const posthog = createPosthogClient(env);
-  initLoggerProvider(env);
 
   const sampleEmail = `Thank you for applying to the Senior Software Engineer position at Acme Corp. We're excited to review your application and will be in touch soon.
 
@@ -113,26 +109,22 @@ export async function email(
   message: ForwardableEmailMessage,
   env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY?: string },
   ctx: ExecutionContext,
+  logger?: OtelLogger | null,
 ) {
   const emailFrom = message.from;
   const emailTo = message.to;
 
   const posthog = createPosthogClient(env);
-  initLoggerProvider(env);
-  const logger = getLogger();
 
-  logger.emit({ severityText: "info", body: "Received", attributes: { tag: "email", from: emailFrom, to: emailTo, size: message.rawSize } });
-  console.log("[email] Received", { from: emailFrom, to: emailTo, size: message.rawSize });
+  logger?.info("[email] Received", { from: emailFrom, to: emailTo, size: message.rawSize });
 
   try {
     const parsed = await PostalMime.parse(message.raw);
-    logger.emit({ severityText: "info", body: "Parsed", attributes: { tag: "email", subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length } });
-    console.log("[email] Parsed", { subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length });
+    logger?.info("[email] Parsed", { subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length });
 
     const bodyText = parsed.text || parsed.html || "";
-    const extracted = await extract(bodyText, parsed.subject || "", fromToString(parsed.from), env, posthog);
-    logger.emit({ severityText: "info", body: "Parsed result", attributes: { tag: "ai", result: JSON.stringify(extracted) } });
-    console.log("[ai] Parsed result:", JSON.stringify(extracted));
+    const extracted = await extract(bodyText, parsed.subject || "", fromToString(parsed.from), env, posthog, logger);
+    logger?.info("[ai] Parsed result", { result: JSON.stringify(extracted) });
 
     if (posthog) {
       ctx.waitUntil(posthog.shutdown());
@@ -142,33 +134,27 @@ export async function email(
       (async () => {
         try {
           if (extracted.type !== "not_job_related") {
-            logger.emit({ severityText: "info", body: "Job application", attributes: { tag: "result", extracted } });
-            console.log("[result] Job application:", JSON.stringify(extracted, null, 2));
+            logger?.info("[result] Job application", { application: JSON.stringify(extracted, null, 2) });
 
             try {
               const notion = getNotion(env);
-              await syncJobApplication(notion, extracted, bodyText, parsed.subject || "");
-              logger.emit({ severityText: "info", body: "Sync complete", attributes: { tag: "notion" } });
-              console.log("[notion] Sync complete");
+              await syncJobApplication(notion, extracted, bodyText, parsed.subject || "", logger);
+              logger?.info("[notion] Sync complete");
             } catch (err) {
-              logger.emit({ severityText: "error", body: "Failed to sync", attributes: { tag: "notion", error: String(err) } });
-              console.error("[notion] Failed to sync:", err);
+              logger?.error("[notion] Failed to sync", { error: String(err) });
               posthog?.captureException(err, extracted.from, { source: "notion_sync" });
             }
           } else {
-            logger.emit({ severityText: "info", body: "Not job-related, skipping", attributes: { tag: "result" } });
-            console.log("[result] Not job-related, skipping");
+            logger?.info("[result] Not job-related, skipping");
           }
         } catch (error) {
-          logger.emit({ severityText: "error", body: "Failed to process", attributes: { tag: "result", error: String(error) } });
-          console.error("[result] Failed to process:", error);
+          logger?.error("[result] Failed to process", { error: String(error) });
           posthog?.captureException(error, emailFrom, { source: "email_processing" });
         }
       })(),
     );
   } catch (error) {
-    logger.emit({ severityText: "error", body: "Failed to process incoming email", attributes: { tag: "email", error: String(error) } });
-    console.error("[email] Failed to process incoming email:", error);
+    logger?.error("[email] Failed to process incoming email", { error: String(error) });
     posthog?.captureException(error, emailFrom, { source: "email_ingress" });
     if (posthog) ctx.waitUntil(posthog.shutdown());
   }

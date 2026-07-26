@@ -1,39 +1,159 @@
-import { logs } from "@opentelemetry/api-logs";
-import { NodeSDK } from "@opentelemetry/sdk-node";
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
-import { BatchLogRecordProcessor } from "@opentelemetry/sdk-logs";
-import { resourceFromAttributes } from "@opentelemetry/resources";
+type OtelAttributeValue =
+  | { stringValue: string }
+  | { intValue: string }
+  | { doubleValue: number }
+  | { boolValue: boolean }
+  | { arrayValue: { values: OtelAttributeValue[] } }
+  | { bytesValue: string };
 
-let _sdk: NodeSDK | null = null;
-let _initialized = false;
+type OtelAttribute = { key: string; value: OtelAttributeValue };
 
-export function initLoggerProvider(env: { POSTHOG_API_KEY?: string; POSTHOG_HOST?: string }) {
-  if (_initialized) return;
-  _initialized = true;
+type OtelLogRecord = {
+  timeUnixNano: string;
+  observedTimeUnixNano?: string;
+  severityNumber: number;
+  severityText: string;
+  body?: { stringValue: string };
+  attributes?: OtelAttribute[];
+};
 
-  const apiKey = env.POSTHOG_API_KEY;
-  if (!apiKey) return;
+type OtelScopeLog = {
+  scope: { name: string };
+  logRecords: OtelLogRecord[];
+};
 
-  const host = env.POSTHOG_HOST || "https://us.i.posthog.com";
+type OtelResourceLog = {
+  resource: { attributes: OtelAttribute[] };
+  scopeLogs: OtelScopeLog[];
+};
 
-  _sdk = new NodeSDK({
-    resource: resourceFromAttributes({ "service.name": "notion-scripts" }),
-    logRecordProcessor: new BatchLogRecordProcessor(
-      // @ts-expect-error OTel SDK lib types expect { exporter } but PostHog docs pass exporter directly
-      new OTLPLogExporter({
-        url: `${host}/i/v1/logs`,
-        headers: { Authorization: `Bearer ${apiKey}` },
-      }),
-    ),
+type OtelPayload = { resourceLogs: OtelResourceLog[] };
+
+const SEVERITY: Record<string, number> = {
+  trace: 1,
+  debug: 5,
+  info: 9,
+  warn: 13,
+  error: 17,
+  fatal: 21,
+};
+
+function encodeValue(v: unknown): OtelAttributeValue {
+  if (typeof v === "string") return { stringValue: v };
+  if (typeof v === "number") {
+    if (Number.isInteger(v)) return { intValue: String(v) };
+    return { doubleValue: v };
+  }
+  if (typeof v === "boolean") return { boolValue: v };
+  if (v instanceof Uint8Array) return { bytesValue: btoa(String.fromCharCode(...v)) };
+  if (Array.isArray(v)) return { arrayValue: { values: v.map(encodeValue) } };
+  return { stringValue: String(v) };
+}
+
+function encodeAttributes(attrs?: Record<string, unknown>): OtelAttribute[] | undefined {
+  if (!attrs || Object.keys(attrs).length === 0) return undefined;
+  return Object.entries(attrs).map(([key, value]) => ({
+    key,
+    value: encodeValue(value),
+  }));
+}
+
+export class OtelLogger {
+  private host: string;
+  private apiKey: string;
+  private logs: OtelLogRecord[] = [];
+  private flushed = false;
+
+  constructor(opts: { host: string; apiKey: string }) {
+    this.host = opts.host;
+    this.apiKey = opts.apiKey;
+  }
+
+  private emit(
+    severityText: string,
+    body: string,
+    attributes?: Record<string, unknown>,
+  ) {
+    const severityNumber = SEVERITY[severityText] ?? 9;
+    const now = BigInt(Date.now()) * BigInt(1_000_000);
+    const timeUnixNano = now.toString();
+    this.logs.push({
+      timeUnixNano,
+      observedTimeUnixNano: timeUnixNano,
+      severityNumber,
+      severityText,
+      body: body ? { stringValue: body } : undefined,
+      attributes: encodeAttributes(attributes),
+    });
+  }
+
+  trace(body: string, attributes?: Record<string, unknown>) {
+    this.emit("trace", body, attributes);
+  }
+  debug(body: string, attributes?: Record<string, unknown>) {
+    this.emit("debug", body, attributes);
+  }
+  info(body: string, attributes?: Record<string, unknown>) {
+    this.emit("info", body, attributes);
+  }
+  warn(body: string, attributes?: Record<string, unknown>) {
+    this.emit("warn", body, attributes);
+  }
+  error(body: string, attributes?: Record<string, unknown>) {
+    this.emit("error", body, attributes);
+  }
+
+  private buildPayload(): OtelPayload {
+    return {
+      resourceLogs: [
+        {
+          resource: {
+            attributes: [
+              { key: "service.name", value: { stringValue: "notion-scripts" } },
+              { key: "service.version", value: { stringValue: "1.0.0" } },
+            ],
+          },
+          scopeLogs: [
+            {
+              scope: { name: "notion-scripts" },
+              logRecords: this.logs,
+            },
+          ],
+        },
+      ],
+    };
+  }
+
+  async flush(): Promise<void> {
+    if (this.flushed || this.logs.length === 0) return;
+    this.flushed = true;
+    const payload = this.buildPayload();
+    const url = `${this.host}/i/v1/logs`;
+    try {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        console.error(`[otel] Failed to send logs: ${res.status} ${await res.text()}`);
+      }
+    } catch (err) {
+      console.error("[otel] Failed to send logs:", err);
+    }
+  }
+}
+
+export function createOtelLogger(env: {
+  POSTHOG_API_KEY?: string;
+  POSTHOG_HOST?: string;
+}): OtelLogger | null {
+  if (!env.POSTHOG_API_KEY) return null;
+  return new OtelLogger({
+    host: env.POSTHOG_HOST || "https://us.i.posthog.com",
+    apiKey: env.POSTHOG_API_KEY,
   });
-
-  _sdk.start();
-}
-
-export function getLogger() {
-  return logs.getLogger("notion-scripts");
-}
-
-export function flushLogs() {
-  return _sdk?.shutdown() ?? Promise.resolve();
 }

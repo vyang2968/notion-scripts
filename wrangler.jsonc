@@ -7,8 +7,9 @@
     "crons": ["*/5 * * * *"],
   },
   "observability": {
-    "enabled": false,
-    "head_sampling_rate": 0,
+    "logs": {
+      "enabled": true,
+    },
   },
   "compatibility_flags": [
     "nodejs_compat"
