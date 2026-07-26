@@ -6,6 +6,7 @@ export type Status = typeof STATUSES[number];
 
 export type JobApplication = {
   type: "job_application";
+  from: string;
   company: string;
   position: string;
   status: Status;
@@ -17,6 +18,7 @@ export type JobApplication = {
 
 export type FollowUp = {
   type: "follow_up";
+  from: string;
   company: string;
   position: string;
   status: Status;
@@ -42,7 +44,17 @@ For a FOLLOW-UP email (recruiter reaching out, interview invitation, status upda
 - status: infer the updated stage
 
 For anything NOT job-related (newsletters, receipts, spam, etc.):
-- type: "not_job_related"`;
+- type: "not_job_related"
+
+Fields:
+- from: the sender email address (always populate for job_application or follow_up)
+- company: the company name
+- position: the job title/role
+- applicationId: any reference/ID number if present, otherwise null
+- applicationDate: today's date in YYYY-MM-DD format
+- contactName: only populate if a real person sent this (e.g. recruiter, hiring manager). Set to null for automated senders like noreply@, jobs@, careers@, etc.
+- contactEmail: the sender's email if a real person, otherwise null
+- status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"`;
 
 export const JSON_SCHEMA = {
   type: "object",
@@ -51,6 +63,7 @@ export const JSON_SCHEMA = {
       type: "string",
       enum: ["job_application", "follow_up", "not_job_related"],
     },
+    from: { type: "string" },
     company: { type: "string" },
     position: { type: "string" },
     status: {
