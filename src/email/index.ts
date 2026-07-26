@@ -143,7 +143,7 @@ export async function email(
 
           try {
             const notion = getNotion(env);
-            await syncJobApplication(notion, extracted);
+            await syncJobApplication(notion, extracted, bodyText, parsed.subject || "");
             console.log("[notion] Sync complete");
           } catch (err) {
             console.error("[notion] Failed to sync:", err);

@@ -63,20 +63,51 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
   return byCompany.results[0] ?? null;
 }
 
-export async function syncJobApplication(notion: Client, data: JobApplication | FollowUp) {
-  const { company, position } = data;
+function buildCorrespondenceBlocks(emailBody: string, emailSubject: string, date: string) {
+  const body = emailBody.length > 5000 ? emailBody.slice(0, 5000) + "\n\n— truncated —" : emailBody;
+
+  return [
+    {
+      toggle: {
+        rich_text: [{ type: "text" as const, text: { content: `${date} - ${emailSubject}` } }],
+        children: [
+          {
+            quote: {
+              rich_text: [{ type: "text" as const, text: { content: body } }],
+            },
+            type: "quote" as const,
+            object: "block" as const,
+          },
+        ],
+      },
+      type: "toggle" as const,
+      object: "block" as const,
+    },
+  ];
+}
+
+export async function syncJobApplication(
+  notion: Client,
+  data: JobApplication | FollowUp,
+  emailBody: string,
+  emailSubject: string,
+) {
+  const { company, position, applicationDate } = data;
 
   const existing = await findExisting(notion, data);
   const properties = buildProperties(data);
+  const blocks = buildCorrespondenceBlocks(emailBody, emailSubject, applicationDate);
 
   if (existing) {
     await notion.pages.update({ page_id: existing.id, properties });
+    await notion.blocks.children.append({ block_id: existing.id, children: blocks, position: { type: "start" } });
     console.log("[notion] Updated page:", existing.id, `${company} - ${position}`);
   } else {
-    await notion.pages.create({
+    const created = await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: DATA_SOURCE_ID },
       properties,
     });
+    await notion.blocks.children.append({ block_id: created.id, children: blocks, position: { type: "start" } });
     console.log("[notion] Created page for:", `${company} - ${position}`);
   }
 }
