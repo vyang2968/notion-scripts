@@ -2,6 +2,7 @@ import type { Client } from "@notionhq/client";
 import type { JobApplication, FollowUp, Status } from "../email/extract";
 
 const DATABASE_ID = "45228394-435c-83c1-867e-01e4061b8120";
+const DATA_SOURCE_ID = "a4328394-435c-8361-b84d-8775c801c09d";
 
 const STATUS_MAP: Record<Status, string> = {
   "applied": "applied",
@@ -43,14 +44,14 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
 
   if (applicationId) {
     const byId = await notion.dataSources.query({
-      data_source_id: DATABASE_ID,
+      data_source_id: DATA_SOURCE_ID,
       filter: { property: "application id" as const, rich_text: { equals: applicationId } },
     });
     if (byId.results.length > 0) return byId.results[0];
   }
 
   const byCompany = await notion.dataSources.query({
-    data_source_id: DATABASE_ID,
+    data_source_id: DATA_SOURCE_ID,
     filter: buildCompanyPositionFilter(data.company, data.position),
     sorts: [{ timestamp: "created_time", direction: "descending" }],
   });
