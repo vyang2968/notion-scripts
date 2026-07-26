@@ -4,12 +4,15 @@ export type AiChatResponse = {
     message?: {
       content?: string;
     };
+    finish_reason?: string;
   }[];
   usage?: {
     prompt_tokens?: number;
     completion_tokens?: number;
   };
 };
+
+export const GEMINI_MODEL = "@cf/google/gemma-4-26b-a4b-it" as const;
 
 const STATUSES = [
   "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected",

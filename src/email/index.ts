@@ -4,7 +4,7 @@ import type { Address } from "postal-mime";
 import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
 import type { AiChatResponse, ExtractionResult } from "./extract";
-import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA } from "./extract";
+import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
 const fromToString = (from: Address | undefined): string => {
   if (!from) return "";
@@ -13,6 +13,8 @@ const fromToString = (from: Address | undefined): string => {
 };
 
 async function extract(bodyText: string, subject: string, from: string, env: any, posthog?: PostHog | null) {
+  const traceId = crypto.randomUUID();
+  const spanId = crypto.randomUUID();
   const prompt = buildPrompt(bodyText, subject, from);
   const messages = [
     {
@@ -23,17 +25,42 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   ];
 
   console.log("[ai] Sending to model", {
-    model: "@cf/google/gemma-4-26b-a4b-it",
+    model: GEMINI_MODEL,
     promptLength: prompt.length,
     bodyPreview: bodyText.slice(0, 200),
   });
 
   const startTime = performance.now();
-  const result = await env.AI.run("@cf/google/gemma-4-26b-a4b-it", { messages });
+  let result: unknown;
+  try {
+    result = await env.AI.run(GEMINI_MODEL, { messages });
+  } catch (err) {
+    const latencyMs = performance.now() - startTime;
+    if (posthog) {
+      posthog.captureImmediate({
+        distinctId: from || "unknown",
+        event: "$ai_generation",
+        properties: {
+          $ai_trace_id: traceId,
+          $ai_span_id: spanId,
+          $ai_span_name: "email_extraction",
+          $ai_model: GEMINI_MODEL,
+          $ai_provider: "cloudflare-workers-ai",
+          $ai_input: messages,
+          $ai_latency: latencyMs / 1000,
+          $ai_is_error: true,
+          $ai_error: String(err),
+          $ai_stream: false,
+        },
+      });
+    }
+    throw err;
+  }
   const latencyMs = performance.now() - startTime;
 
   const aiResponse = result as AiChatResponse;
-  const raw = aiResponse.response ?? aiResponse.choices?.[0]?.message?.content;
+  const aiChoice = aiResponse.choices?.[0];
+  const raw = aiResponse.response ?? aiChoice?.message?.content;
   console.log("[ai] Raw response:", typeof raw, raw?.slice?.(0, 300));
 
   if (posthog) {
@@ -42,13 +69,18 @@ async function extract(bodyText: string, subject: string, from: string, env: any
       distinctId: from || "unknown",
       event: "$ai_generation",
       properties: {
-        $ai_model: "@cf/google/gemma-4-26b-a4b-it",
+        $ai_trace_id: traceId,
+        $ai_span_id: spanId,
+        $ai_span_name: "email_extraction",
+        $ai_model: GEMINI_MODEL,
         $ai_provider: "cloudflare-workers-ai",
         $ai_input: messages,
-        $ai_output_choices: [{ content: raw }],
-        $ai_latency: latencyMs / 1000,
         $ai_input_tokens: usage?.prompt_tokens ?? null,
+        $ai_output_choices: [{ role: "assistant", content: raw }],
         $ai_output_tokens: usage?.completion_tokens ?? null,
+        $ai_latency: latencyMs / 1000,
+        $ai_stop_reason: aiChoice?.finish_reason ?? null,
+        $ai_stream: false,
       },
     });
   }
