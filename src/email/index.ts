@@ -1,7 +1,8 @@
 import PostalMime from "postal-mime";
 import type { ForwardableEmailMessage, ExecutionContext } from "@cloudflare/workers-types";
 import type { Address } from "postal-mime";
-import { buildPrompt, parseResponse, SYSTEM_PROMPT } from "./extract";
+import type { ExtractionResult } from "./extract";
+import { buildPrompt, SYSTEM_PROMPT, JSON_SCHEMA } from "./extract";
 
 const fromToString = (from: Address | undefined): string => {
   if (!from) return "";
@@ -14,36 +15,55 @@ export async function email(
   env: { AI: { run: (model: string, input: any) => Promise<any> } },
   ctx: ExecutionContext,
 ) {
+  const emailFrom = message.from;
+  const emailTo = message.to;
+  console.log("[email] Received", { from: emailFrom, to: emailTo, size: message.rawSize });
+
   const parsed = await PostalMime.parse(message.raw);
+  console.log("[email] Parsed", {
+    subject: parsed.subject,
+    from: fromToString(parsed.from),
+    hasText: !!parsed.text,
+    hasHtml: !!parsed.html,
+    attachmentCount: parsed.attachments.length,
+  });
 
-  const prompt = buildPrompt(
-    parsed.text || parsed.html || "",
-    parsed.subject || "",
-    fromToString(parsed.from),
-  );
+  const bodyText = parsed.text || parsed.html || "";
+  const prompt = buildPrompt(bodyText, parsed.subject || "", fromToString(parsed.from));
+  console.log("[ai] Sending to model", {
+    model: "@cf/meta/llama-3.1-8b-instruct",
+    promptLength: prompt.length,
+    bodyPreview: bodyText.slice(0, 200),
+  });
 
-  const result = await env.AI.run("@cf/meta/llama-3.2-3b-instruct", {
+  const result = await env.AI.run("@cf/meta/llama-3.1-8b-instruct", {
     messages: [
       { role: "system", content: SYSTEM_PROMPT },
       { role: "user", content: prompt },
     ],
+    response_format: {
+      type: "json_schema",
+      json_schema: JSON_SCHEMA,
+    },
   });
 
-  const extracted = parseResponse(result.response);
+  console.log("[ai] Raw response type:", typeof result.response);
+
+  const extracted = result.response as ExtractionResult;
+  console.log("[ai] Parsed result:", JSON.stringify(extracted));
 
   ctx.waitUntil(
     (async () => {
       try {
         if (extracted.type !== "not_job_related") {
-          console.log("Job application detected:", JSON.stringify(extracted, null, 2));
+          console.log("[result] Job application:", JSON.stringify(extracted, null, 2));
         } else {
-          console.log("Not job-related, skipping");
+          console.log("[result] Not job-related, skipping");
         }
       } catch (error) {
-        console.error("Failed to process extracted data:", error);
+        console.error("[result] Failed to process:", error);
       }
     })(),
   );
 
-  await message.forward("vyang@hey.com");
 }

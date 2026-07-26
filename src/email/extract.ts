@@ -1,29 +1,35 @@
-type JobApplication = {
+const STATUSES = [
+  "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected",
+] as const;
+
+export type Status = typeof STATUSES[number];
+
+export type JobApplication = {
   type: "job_application";
   company: string;
   position: string;
-  status: "applied" | "online assessment" | "phone screen" | "interviewing" | "offer" | "accepted" | "rejected";
-  applicationId: string | undefined;
-  contactName: string | undefined;
-  contactEmail: string | undefined;
+  status: Status;
+  applicationId: string | null;
+  contactName: string | null;
+  contactEmail: string | null;
   applicationDate: string;
 };
 
-type NotJobRelated = {
-  type: "not_job_related";
-};
-
-type FollowUp = {
+export type FollowUp = {
   type: "follow_up";
   company: string;
   position: string;
-  status: "applied" | "online assessment" | "phone screen" | "interviewing" | "offer" | "accepted" | "rejected";
-  contactName: string | undefined;
-  contactEmail: string | undefined;
+  status: Status;
+  contactName: string | null;
+  contactEmail: string | null;
   applicationDate: string;
 };
 
-export type ExtractionResult = JobApplication | NotJobRelated | FollowUp;
+export type NotJobRelated = {
+  type: "not_job_related";
+};
+
+export type ExtractionResult = JobApplication | FollowUp | NotJobRelated;
 
 export const SYSTEM_PROMPT = `You are parsing job application emails. Determine if the email is related to a job application, then extract structured data.
 
@@ -36,33 +42,33 @@ For a FOLLOW-UP email (recruiter reaching out, interview invitation, status upda
 - status: infer the updated stage
 
 For anything NOT job-related (newsletters, receipts, spam, etc.):
-- type: "not_job_related"
+- type: "not_job_related"`;
 
-Rules:
-- company: the company name
-- position: the job title/role
-- applicationId: any reference/ID number if present, otherwise undefined
-- contactName: sender's name if a person (not a noreply), otherwise undefined
-- contactEmail: sender's email if a person, otherwise undefined
-- applicationDate: today's date in YYYY-MM-DD format
-- status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"
+export const JSON_SCHEMA = {
+  type: "object",
+  properties: {
+    type: {
+      type: "string",
+      enum: ["job_application", "follow_up", "not_job_related"],
+    },
+    company: { type: "string" },
+    position: { type: "string" },
+    status: {
+      type: "string",
+      enum: STATUSES,
+    },
+    applicationId: { type: ["string", "null"] },
+    contactName: { type: ["string", "null"] },
+    contactEmail: { type: ["string", "null"] },
+    applicationDate: { type: "string" },
+  },
+  required: ["type"],
+};
 
-Return ONLY valid JSON, no other text.`;
-
-export function buildPrompt(emailText: string, emailSubject: string, emailFrom: string): string {
+export function buildPrompt(emailText: string, emailSubject: string, emailFrom: string) {
   return `Email from: ${emailFrom}
 Subject: ${emailSubject}
 
 Body:
-${emailText?.slice(0, 3000) || "(no text content)"}
-
-Return JSON:`;
-}
-
-export function parseResponse(raw: string): ExtractionResult {
-  const cleaned = raw
-    .replace(/^```(?:json)?\s*/i, "")
-    .replace(/\s*```$/i, "")
-    .trim();
-  return JSON.parse(cleaned);
+${emailText?.slice(0, 3000) || "(no text content)"}`;
 }
