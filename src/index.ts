@@ -38,6 +38,20 @@ app.get("/api/v1/test/ai", async (c) => {
   return c.json(result);
 });
 
+app.get("/api/v1/test/logs", async (c) => {
+  initLoggerProvider(c.env);
+  const logger = getLogger();
+
+  logger.emit({ severityText: "trace", body: "test trace", attributes: { tag: "test" } });
+  logger.emit({ severityText: "debug", body: "test debug", attributes: { tag: "test" } });
+  logger.emit({ severityText: "info", body: "test info", attributes: { tag: "test" } });
+  logger.emit({ severityText: "warn", body: "test warn", attributes: { tag: "test" } });
+  logger.emit({ severityText: "error", body: "test error", attributes: { tag: "test", foo: "bar" } });
+
+  throw new Error("test-error-for-posthog-capture");
+  return c.json({ logs: "sent" });
+});
+
 app.onError(async (err, c) => {
   captureError(err, c.env, c.executionCtx, "fetch_handler", { path: c.req.path });
   return c.json({ error: "Internal error" }, 500);
