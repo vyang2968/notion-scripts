@@ -17,9 +17,13 @@ const STATUS_MAP: Record<Status, string> = {
 function buildProperties(data: JobApplication | FollowUp) {
   const { company, position, status, applicationDate, contactName, contactEmail, from } = data;
   const applicationId = data.type === "job_application" ? data.applicationId : null;
+  const title = applicationId
+    ? `${company} - ${position} - ${applicationId}`
+    : `${company} - ${position}`;
 
   return {
-    "company": { title: [{ text: { content: company } }] },
+    "title": { title: [{ text: { content: title } }] },
+    "company": { rich_text: [{ text: { content: company } }] },
     "position": { rich_text: [{ text: { content: position } }] },
     "status": { multi_select: [{ name: STATUS_MAP[status] }] },
     "application date": { date: { start: applicationDate } },
@@ -33,7 +37,7 @@ function buildProperties(data: JobApplication | FollowUp) {
 function buildCompanyPositionFilter(company: string, position: string) {
   return {
     and: [
-      { property: "company" as const, title: { equals: company } },
+      { property: "company" as const, rich_text: { equals: company } },
       { property: "position" as const, rich_text: { equals: position } },
     ],
   };
@@ -70,7 +74,7 @@ export async function syncJobApplication(notion: Client, data: JobApplication | 
     console.log("[notion] Updated page:", existing.id, `${company} - ${position}`);
   } else {
     await notion.pages.create({
-      parent: { database_id: DATABASE_ID },
+      parent: { type: "data_source_id", data_source_id: DATA_SOURCE_ID },
       properties,
     });
     console.log("[notion] Created page for:", `${company} - ${position}`);
