@@ -65,6 +65,20 @@ export const JSON_SCHEMA = {
   required: ["type"],
 };
 
+export function parseResponse(raw: unknown): ExtractionResult {
+  if (typeof raw !== "string") {
+    throw new Error(`Expected string response, got ${typeof raw}`);
+  }
+  const cleaned = raw
+    .replace(/^```(?:json)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  const parsed = JSON.parse(cleaned);
+  if (parsed.type === "not_job_related") return parsed;
+  if (!parsed.company) throw new Error("Missing required field: company");
+  return parsed;
+}
+
 export function buildPrompt(emailText: string, emailSubject: string, emailFrom: string) {
   return `Email from: ${emailFrom}
 Subject: ${emailSubject}
