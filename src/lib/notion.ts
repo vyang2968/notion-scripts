@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import { env as getHonoEnv } from "hono/adapter";
 
 export type EnvBindings = {
-  NOTION_API_KEY: string;
+  NOTION_API_KEY?: string;
 };
 
 let notion: Client;

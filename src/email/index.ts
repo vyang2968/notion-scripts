@@ -3,6 +3,8 @@ import type { ForwardableEmailMessage, ExecutionContext } from "@cloudflare/work
 import type { Address } from "postal-mime";
 import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
+import { getNotion } from "../lib/notion";
+import { syncJobApplication } from "../lib/job-applications";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
@@ -107,7 +109,7 @@ HR Team`;
 
 export async function email(
   message: ForwardableEmailMessage,
-  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string },
+  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY?: string },
   ctx: ExecutionContext,
 ) {
   const posthog = createPosthogClient(env);
@@ -138,6 +140,14 @@ export async function email(
       try {
         if (extracted.type !== "not_job_related") {
           console.log("[result] Job application:", JSON.stringify(extracted, null, 2));
+
+          try {
+            const notion = getNotion(env);
+            await syncJobApplication(notion, extracted);
+            console.log("[notion] Sync complete");
+          } catch (err) {
+            console.error("[notion] Failed to sync:", err);
+          }
         } else {
           console.log("[result] Not job-related, skipping");
         }
