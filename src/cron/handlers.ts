@@ -51,6 +51,4 @@ export async function reportHealth(env: EnvBindings) {
 
 export async function populateMealPlan(env: EnvBindings) {
   const notion = getNotion(env);
-
-  console.log("populating meal plan");
 }
