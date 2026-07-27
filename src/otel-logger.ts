@@ -61,12 +61,14 @@ function encodeAttributes(attrs?: Record<string, unknown>): OtelAttribute[] | un
 export class OtelLogger {
   private host: string;
   private apiKey: string;
+  private serviceName: string;
   private logs: OtelLogRecord[] = [];
   private flushed = false;
 
-  constructor(opts: { host: string; apiKey: string }) {
+  constructor(opts: { host: string; apiKey: string; serviceName?: string }) {
     this.host = opts.host;
     this.apiKey = opts.apiKey;
+    this.serviceName = opts.serviceName ?? "notion-scripts";
   }
 
   private emit(
@@ -109,13 +111,14 @@ export class OtelLogger {
         {
           resource: {
             attributes: [
-              { key: "service.name", value: { stringValue: "notion-scripts" } },
+              { key: "service.namespace", value: { stringValue: "notion-scripts" } },
+              { key: "service.name", value: { stringValue: this.serviceName } },
               { key: "service.version", value: { stringValue: "1.0.0" } },
             ],
           },
           scopeLogs: [
             {
-              scope: { name: "notion-scripts" },
+              scope: { name: this.serviceName },
               logRecords: this.logs,
             },
           ],
@@ -147,13 +150,14 @@ export class OtelLogger {
   }
 }
 
-export function createOtelLogger(env: {
-  POSTHOG_API_KEY?: string;
-  POSTHOG_HOST?: string;
-}): OtelLogger | null {
+export function createOtelLogger(
+  env: { POSTHOG_API_KEY?: string; POSTHOG_HOST?: string },
+  serviceName?: string,
+): OtelLogger | null {
   if (!env.POSTHOG_API_KEY) return null;
   return new OtelLogger({
     host: env.POSTHOG_HOST || "https://us.i.posthog.com",
     apiKey: env.POSTHOG_API_KEY,
+    serviceName,
   });
 }

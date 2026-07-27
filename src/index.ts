@@ -35,7 +35,7 @@ const app = new Hono<{ Bindings: Env }>();
 app.get("/", async (c) => {});
 
 app.post("/api/v1/meal-planner/webhooks", async (c) => {
-  const logger = createOtelLogger(c.env);
+  const logger = createOtelLogger(c.env, "meal-planner");
   try {
     return await handle(c, logger);
   } finally {
@@ -44,7 +44,7 @@ app.post("/api/v1/meal-planner/webhooks", async (c) => {
 });
 
 app.get("/api/v1/test/ai", async (c) => {
-  const logger = createOtelLogger(c.env);
+  const logger = createOtelLogger(c.env, "test");
   const waitUntil = c.executionCtx.waitUntil.bind(c.executionCtx);
   const result = await testAiExtraction(c.env, waitUntil);
   logger?.info("test ai endpoint", { result: result.success });
@@ -53,7 +53,7 @@ app.get("/api/v1/test/ai", async (c) => {
 });
 
 app.get("/api/v1/test/logs", async (c) => {
-  const logger = createOtelLogger(c.env);
+  const logger = createOtelLogger(c.env, "test");
   logger?.info("test log at info level");
   logger?.info("test info with attrs", { tag: "test", severity: "info" });
   logger?.warn("test warn", { tag: "test", severity: "warn" });
@@ -63,14 +63,14 @@ app.get("/api/v1/test/logs", async (c) => {
 });
 
 app.onError(async (err, c) => {
-  const logger = createOtelLogger(c.env);
+  const logger = createOtelLogger(c.env, "notion-scripts");
   captureError(err, c.env, c.executionCtx, "fetch_handler", { path: c.req.path }, logger);
   if (logger) c.executionCtx.waitUntil(logger.flush());
   return c.json({ error: "Internal error" }, 500);
 });
 
 async function wrapFetch(request: Request, env: Env, ctx: ExecutionContext) {
-  const logger = createOtelLogger(env);
+  const logger = createOtelLogger(env, "notion-scripts");
   try {
     return await app.fetch(request, env, ctx);
   } catch (err) {
@@ -81,7 +81,7 @@ async function wrapFetch(request: Request, env: Env, ctx: ExecutionContext) {
 }
 
 async function wrapScheduled(event: ScheduledController, env: Env, ctx: ExecutionContext) {
-  const logger = createOtelLogger(env);
+  const logger = createOtelLogger(env, "cron");
   try {
     await scheduled(event, env as any, ctx as any, logger);
   } catch (err) {
@@ -92,7 +92,7 @@ async function wrapScheduled(event: ScheduledController, env: Env, ctx: Executio
 }
 
 async function wrapEmail(message: ForwardableEmailMessage, env: Env, ctx: ExecutionContext) {
-  const logger = createOtelLogger(env);
+  const logger = createOtelLogger(env, "email");
   try {
     await email(message, env as any, ctx as any, logger);
   } catch (err) {
