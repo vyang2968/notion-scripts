@@ -101,13 +101,13 @@ export async function syncJobApplication(
   if (existing) {
     await notion.pages.update({ page_id: existing.id, properties });
     await notion.blocks.children.append({ block_id: existing.id, children: blocks, position: { type: "start" } });
-    console.log("[notion] Updated page:", existing.id, `${company} - ${position}`);
+    console.log({ service: "notion-scripts", component: "notion", event: "page_updated", pageId: existing.id, title: `${company} - ${position}` });
   } else {
     const created = await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: DATA_SOURCE_ID },
       properties,
     });
     await notion.blocks.children.append({ block_id: created.id, children: blocks, position: { type: "start" } });
-    console.log("[notion] Created page for:", `${company} - ${position}`);
+    console.log({ service: "notion-scripts", component: "notion", event: "page_created", title: `${company} - ${position}` });
   }
 }

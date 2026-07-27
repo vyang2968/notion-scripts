@@ -9,6 +9,6 @@ export async function scheduled(
   env: { POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY: string },
   ctx: ExecutionContext,
 ) {
-  console.log(`Cron triggered at: ${new Date().toISOString()}`);
+  console.log({ service: "cron", event: "triggered", time: new Date().toISOString() });
   ctx.waitUntil(reportHealth(env));
 }

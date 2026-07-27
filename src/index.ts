@@ -14,7 +14,7 @@ type Env = {
 };
 
 function captureError(err: unknown, env: Env, ctx: ExecutionContext, source: string, extra?: Record<string, unknown>) {
-  console.error(`[fatal] ${source}:`, err);
+  console.error({ service: "notion-scripts", severity: "fatal", source, error: String(err), ...extra });
   const posthog = createPosthogClient(env);
   if (posthog) {
     posthog.captureException(err, "system", { source, ...extra });
@@ -35,10 +35,10 @@ app.get("/api/v1/test/ai", async (c) => {
 });
 
 app.get("/api/v1/test/logs", async (c) => {
-  console.log("test log at info level");
-  console.info("test info with attrs", { tag: "test", severity: "info" });
-  console.warn("test warn", { tag: "test", severity: "warn" });
-  console.error("test error", { tag: "test", severity: "error" });
+  console.log({ service: "test", severity: "info", message: "test log at info level" });
+  console.info({ service: "test", severity: "info", tag: "test" });
+  console.warn({ service: "test", severity: "warn", message: "test warn", tag: "test" });
+  console.error({ service: "test", severity: "error", message: "test error", tag: "test" });
   throw new Error("test-error-for-posthog-capture");
 });
 
