@@ -108,10 +108,11 @@ export function parseResponse(raw: unknown): ExtractionResult {
   return parsed;
 }
 
-export function buildPrompt(emailText: string, emailSubject: string, emailFrom: string) {
+export function buildPrompt(emailText: string, emailSubject: string, emailFrom: string, sentDate?: string) {
+  const dateLine = sentDate ? `Sent: ${sentDate}` : "";
   return `Email from: ${emailFrom}
 Subject: ${emailSubject}
-
+${dateLine}
 Body:
 ${emailText?.slice(0, 3000) || "(no text content)"}`;
 }

@@ -8,20 +8,28 @@ import { syncJobApplication } from "../lib/job-applications";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
+const formatDate = (d: Date | string | undefined): string | undefined => {
+  if (!d) return undefined;
+  const date = typeof d === "string" ? new Date(d) : d;
+  if (isNaN(date.getTime())) return undefined;
+  return date.toISOString().split("T")[0];
+};
+
 const fromToString = (from: Address | undefined): string => {
   if (!from) return "";
   if ("group" in from && from.group) return from.name || "";
   return from.name ? `${from.name} <${from.address}>` : from.address || "";
 };
 
-async function extract(bodyText: string, subject: string, from: string, env: any, posthog?: PostHog | null) {
+async function extract(bodyText: string, subject: string, from: string, env: any, posthog?: PostHog | null, sentDate?: string) {
   const traceId = crypto.randomUUID();
   const spanId = crypto.randomUUID();
-  const prompt = buildPrompt(bodyText, subject, from);
+  const prompt = buildPrompt(bodyText, subject, from, sentDate);
+  const dateRef = sentDate ? `The email was sent on ${sentDate}.` : `Today's date is ${new Date().toISOString().split("T")[0]}.`;
   const messages = [
     {
       role: "system",
-      content: `${SYSTEM_PROMPT}\n\nReturn ONLY valid JSON matching this schema, no other text:\n${JSON.stringify(JSON_SCHEMA)}`,
+      content: `${dateRef}\n\n${SYSTEM_PROMPT}\n\nReturn ONLY valid JSON matching this schema, no other text:\n${JSON.stringify(JSON_SCHEMA)}`,
     },
     { role: "user", content: prompt },
   ];
@@ -84,7 +92,11 @@ async function extract(bodyText: string, subject: string, from: string, env: any
     });
   }
 
-  return parseResponse(raw) as ExtractionResult;
+  const parsed = parseResponse(raw) as ExtractionResult;
+  if (parsed.type !== "not_job_related" && sentDate) {
+    parsed.applicationDate = sentDate;
+  }
+  return parsed;
 }
 
 export async function testAiExtraction(env: any, waitUntil?: (p: Promise<any>) => void): Promise<{ success: boolean; result: ExtractionResult }> {
@@ -121,7 +133,8 @@ export async function email(
     console.log({ service: "email", component: "ingress", event: "parsed", subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length });
 
     const bodyText = parsed.text || parsed.html || "";
-    const extracted = await extract(bodyText, parsed.subject || "", fromToString(parsed.from), env, posthog);
+    const dateValue = parsed.date ? formatDate(parsed.date) : undefined;
+    const extracted = await extract(bodyText, parsed.subject || "", fromToString(parsed.from), env, posthog, dateValue);
     console.log({ service: "email", component: "ai", event: "parsed_result", extracted });
 
     if (posthog) {
