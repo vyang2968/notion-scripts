@@ -6,6 +6,12 @@
   "triggers": {
     "crons": ["*/5 * * * *"],
   },
+  "observability": {
+    "logs": {
+      "enabled": true,
+      "destinations": ["posthog-logs"]
+    },
+  },
   "compatibility_flags": [
     "nodejs_compat"
   ],

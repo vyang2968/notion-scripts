@@ -1,14 +1,13 @@
 import { Context } from "hono";
 import { createPosthogClient } from "../../posthog";
-import { OtelLogger } from "../../otel-logger";
 import { getWebhookEventType, verifyWebhook } from "./utils";
 
 async function handlePopulateWebhookEvent() {}
 
-export async function handle(c: Context, logger?: OtelLogger | null) {
+export async function handle(c: Context) {
   const posthog = createPosthogClient(c.env);
 
-  logger?.info("Received webhook event");
+  console.log("Received webhook event");
 
   const isVerified = await verifyWebhook(c);
   if (!isVerified) {
@@ -25,16 +24,15 @@ export async function handle(c: Context, logger?: OtelLogger | null) {
             await handlePopulateWebhookEvent();
             break;
           default:
-            logger?.warn("Unknown event type", { eventType: webhookEventType });
+            console.log("Unknown event type", webhookEventType);
         }
       } catch (error) {
-        logger?.error("Failed to process Notion automation background event", { error: String(error) });
+        console.error("Failed to process Notion automation background event:", error);
         posthog?.captureException(error, "webhook", { source: "webhook_background" });
       }
     })(),
   );
 
-  if (logger) c.executionCtx.waitUntil(logger.flush());
   if (posthog) c.executionCtx.waitUntil(posthog.shutdown());
 
   return c.json({ success: true }, 200);

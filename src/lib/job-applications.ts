@@ -1,6 +1,5 @@
 import type { Client } from "@notionhq/client";
 import type { JobApplication, FollowUp, Status } from "../email/extract";
-import { OtelLogger } from "../otel-logger";
 
 const DATABASE_ID = "45228394-435c-83c1-867e-01e4061b8120";
 const DATA_SOURCE_ID = "a4328394-435c-8361-b84d-8775c801c09d";
@@ -92,7 +91,6 @@ export async function syncJobApplication(
   data: JobApplication | FollowUp,
   emailBody: string,
   emailSubject: string,
-  logger?: OtelLogger | null,
 ) {
   const { company, position, applicationDate } = data;
 
@@ -103,13 +101,13 @@ export async function syncJobApplication(
   if (existing) {
     await notion.pages.update({ page_id: existing.id, properties });
     await notion.blocks.children.append({ block_id: existing.id, children: blocks, position: { type: "start" } });
-    logger?.info("[notion] Updated page", { pageId: existing.id, title: `${company} - ${position}` });
+    console.log("[notion] Updated page:", existing.id, `${company} - ${position}`);
   } else {
     const created = await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: DATA_SOURCE_ID },
       properties,
     });
     await notion.blocks.children.append({ block_id: created.id, children: blocks, position: { type: "start" } });
-    logger?.info("[notion] Created page", { pageId: created.id, title: `${company} - ${position}` });
+    console.log("[notion] Created page for:", `${company} - ${position}`);
   }
 }
