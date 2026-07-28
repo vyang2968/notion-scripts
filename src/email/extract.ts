@@ -65,9 +65,9 @@ For anything NOT job-related (newsletters, receipts, spam, etc.):
 Fields:
 - from: the sender email address (always populate for job_application or follow_up)
 - company: the company name
-- position: the job title/role
+- position: the job title/role. Use "Unknown" if the job title cannot be determined.
 - applicationId: any reference/ID number if present, otherwise null
-- applicationDate: today's date in YYYY-MM-DD format
+- applicationDate: the date from the "Sent" line in the email body, in YYYY-MM-DD format
 - contactName: only populate if a real person sent this (e.g. recruiter, hiring manager). Set to null for automated senders like noreply@, jobs@, careers@, etc.
 - contactEmail: the sender's email if a real person, otherwise null
 - status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"`;

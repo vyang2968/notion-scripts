@@ -34,12 +34,13 @@ function buildProperties(data: JobApplication | FollowUp) {
   };
 }
 
-function buildCompanyPositionFilter(company: string, position: string | null | undefined) {
-  const filters: { property: string; rich_text: { equals: string } }[] = [];
-  if (company) filters.push({ property: "company", rich_text: { equals: company } });
-  if (position) filters.push({ property: "position", rich_text: { equals: position } });
-  if (filters.length === 0) return null;
-  return filters.length === 1 ? filters[0] : { and: filters };
+function buildCompanyPositionFilter(company: string, position: string) {
+  return {
+    and: [
+      { property: "company" as const, rich_text: { equals: company } },
+      { property: "position" as const, rich_text: { equals: position } },
+    ],
+  };
 }
 
 async function findExisting(notion: Client, data: JobApplication | FollowUp) {
@@ -53,17 +54,13 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
     if (byId.results.length > 0) return byId.results[0];
   }
 
-  const companyPositionFilter = buildCompanyPositionFilter(data.company, data.position);
-  if (companyPositionFilter) {
-    const byCompany = await notion.dataSources.query({
-      data_source_id: DATA_SOURCE_ID,
-      filter: companyPositionFilter,
-      sorts: [{ timestamp: "created_time", direction: "descending" }],
-    });
-    if (byCompany.results.length > 0) return byCompany.results[0];
-  }
+  const byCompany = await notion.dataSources.query({
+    data_source_id: DATA_SOURCE_ID,
+    filter: buildCompanyPositionFilter(data.company, data.position),
+    sorts: [{ timestamp: "created_time", direction: "descending" }],
+  });
 
-  return null;
+  return byCompany.results[0] ?? null;
 }
 
 function buildCorrespondenceBlocks(emailBody: string, emailSubject: string, date: string) {
