@@ -63,8 +63,10 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
   return byCompany.results[0] ?? null;
 }
 
+const MAX_EMAIL_BODY_LENGTH = 2000;
+
 function buildCorrespondenceBlocks(emailBody: string, emailSubject: string, date: string) {
-  const body = emailBody.length > 5000 ? emailBody.slice(0, 5000) + "\n\n— truncated —" : emailBody;
+  const body = emailBody.length > MAX_EMAIL_BODY_LENGTH ? emailBody.slice(0, MAX_EMAIL_BODY_LENGTH) + "\n\n— truncated —" : emailBody;
 
   return [
     {
