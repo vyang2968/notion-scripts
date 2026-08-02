@@ -3,10 +3,13 @@ import type { ForwardableEmailMessage, ExecutionContext } from "@cloudflare/work
 import type { Address } from "postal-mime";
 import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
+import { createLogger } from "../lib/logger";
 import { getNotion } from "../lib/notion";
 import { syncJobApplication } from "../lib/job-applications";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
+
+const log = createLogger("email");
 
 const formatDate = (d: Date | string | undefined): string | undefined => {
   if (!d) return undefined;
@@ -34,7 +37,7 @@ async function extract(bodyText: string, subject: string, from: string, env: any
     { role: "user", content: prompt },
   ];
 
-  console.log({ service: "email", component: "ai", event: "sending_to_model", model: GEMINI_MODEL, promptLength: prompt.length, bodyPreview: bodyText.slice(0, 200) });
+  log.log({ component: "ai", event: "sending_to_model", model: GEMINI_MODEL, promptLength: prompt.length, bodyPreview: bodyText.slice(0, 200) });
 
   const startTime = performance.now();
   let result: unknown;
@@ -68,7 +71,7 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   const aiResponse = result as AiChatResponse;
   const aiChoice = aiResponse.choices?.[0];
   const raw = aiResponse.response ?? aiChoice?.message?.content;
-  console.log({ service: "email", component: "ai", event: "raw_response", type: typeof raw, preview: raw?.slice?.(0, 300) });
+  log.log({ component: "ai", event: "raw_response", type: typeof raw, preview: raw?.slice?.(0, 300) });
 
   if (posthog) {
     const usage = aiResponse.usage;
@@ -126,16 +129,16 @@ export async function email(
 
   const posthog = createPosthogClient(env);
 
-  console.log({ service: "email", component: "ingress", event: "received", from: emailFrom, to: emailTo, size: message.rawSize });
+  log.log({ component: "ingress", event: "received", from: emailFrom, to: emailTo, size: message.rawSize });
 
   try {
     const parsed = await PostalMime.parse(message.raw);
-    console.log({ service: "email", component: "ingress", event: "parsed", subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length });
+    log.log({ component: "ingress", event: "parsed", subject: parsed.subject, from: fromToString(parsed.from), hasText: !!parsed.text, hasHtml: !!parsed.html, attachmentCount: parsed.attachments.length });
 
     const bodyText = parsed.text || parsed.html || "";
     const dateValue = parsed.date ? formatDate(parsed.date) : undefined;
     const extracted = await extract(bodyText, parsed.subject || "", fromToString(parsed.from), env, posthog, dateValue);
-    console.log({ service: "email", component: "ai", event: "parsed_result", extracted });
+    log.log({ component: "ai", event: "parsed_result", extracted });
 
     if (posthog) {
       ctx.waitUntil(posthog.shutdown());
@@ -145,27 +148,27 @@ export async function email(
       (async () => {
         try {
           if (extracted.type !== "not_job_related") {
-            console.log({ service: "email", component: "result", event: "job_application", extracted });
+            log.log({ component: "result", event: "job_application", extracted });
 
             try {
               const notion = getNotion(env);
               await syncJobApplication(notion, extracted, bodyText, parsed.subject || "");
-              console.log({ service: "email", component: "notion", event: "sync_complete" });
+              log.log({ component: "notion", event: "sync_complete" });
             } catch (err) {
-              console.error({ service: "email", component: "notion", event: "sync_failed", error: String(err) });
+              log.error({ component: "notion", event: "sync_failed", error: String(err) });
               posthog?.captureException(err, extracted.from, { source: "notion_sync" });
             }
           } else {
-            console.log({ service: "email", component: "result", event: "not_job_related" });
+            log.log({ component: "result", event: "not_job_related" });
           }
         } catch (error) {
-          console.error({ service: "email", component: "result", event: "process_failed", error: String(error) });
+          log.error({ component: "result", event: "process_failed", error: String(error) });
           posthog?.captureException(error, emailFrom, { source: "email_processing" });
         }
       })(),
     );
   } catch (error) {
-    console.error({ service: "email", component: "ingress", event: "process_failed", error: String(error) });
+    log.error({ component: "ingress", event: "process_failed", error: String(error) });
     posthog?.captureException(error, emailFrom, { source: "email_ingress" });
     if (posthog) ctx.waitUntil(posthog.shutdown());
   }

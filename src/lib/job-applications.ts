@@ -1,5 +1,8 @@
 import type { Client } from "@notionhq/client";
 import type { JobApplication, FollowUp, Status } from "../email/extract";
+import { createLogger } from "./logger";
+
+const log = createLogger("email");
 
 const DATABASE_ID = "45228394-435c-83c1-867e-01e4061b8120";
 const DATA_SOURCE_ID = "a4328394-435c-8361-b84d-8775c801c09d";
@@ -103,13 +106,13 @@ export async function syncJobApplication(
   if (existing) {
     await notion.pages.update({ page_id: existing.id, properties });
     await notion.blocks.children.append({ block_id: existing.id, children: blocks, position: { type: "start" } });
-    console.log({ service: "notion-scripts", component: "notion", event: "page_updated", pageId: existing.id, title: `${company} - ${position}` });
+    log.log({ component: "notion", event: "page_updated", pageId: existing.id, title: `${company} - ${position}` });
   } else {
     const created = await notion.pages.create({
       parent: { type: "data_source_id", data_source_id: DATA_SOURCE_ID },
       properties,
     });
     await notion.blocks.children.append({ block_id: created.id, children: blocks, position: { type: "start" } });
-    console.log({ service: "notion-scripts", component: "notion", event: "page_created", title: `${company} - ${position}` });
+    log.log({ component: "notion", event: "page_created", title: `${company} - ${position}` });
   }
 }

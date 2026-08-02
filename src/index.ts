@@ -5,6 +5,7 @@ import { scheduled } from "./cron";
 import { handle } from "./webhooks/meal-planner";
 import { email, testAiExtraction } from "./email";
 import { createPosthogClient } from "./posthog";
+import { createLogger } from "./lib/logger";
 
 type Env = {
   AI: { run: (model: string, input: any) => Promise<any> };
@@ -13,8 +14,8 @@ type Env = {
   NOTION_API_KEY?: string;
 };
 
-function captureError(err: unknown, env: Env, ctx: ExecutionContext, source: string, extra?: Record<string, unknown>) {
-  console.error({ service: "notion-scripts", severity: "fatal", source, error: String(err), ...extra });
+function captureError(err: unknown, env: Env, ctx: ExecutionContext, source: string, service: string, extra?: Record<string, unknown>) {
+  createLogger(service).error({ severity: "fatal", source, error: String(err), ...extra });
   const posthog = createPosthogClient(env);
   if (posthog) {
     posthog.captureException(err, "system", { source, ...extra });
@@ -23,6 +24,8 @@ function captureError(err: unknown, env: Env, ctx: ExecutionContext, source: str
 }
 
 const app = new Hono<{ Bindings: Env }>();
+
+const testLog = createLogger("test");
 
 app.get("/", async (c) => {});
 
@@ -35,15 +38,15 @@ app.get("/api/v1/test/ai", async (c) => {
 });
 
 app.get("/api/v1/test/logs", async (c) => {
-  console.log({ service: "test", severity: "info", message: "test log at info level" });
-  console.info({ service: "test", severity: "info", tag: "test" });
-  console.warn({ service: "test", severity: "warn", message: "test warn", tag: "test" });
-  console.error({ service: "test", severity: "error", message: "test error", tag: "test" });
+  testLog.log({ severity: "info", message: "test log at info level" });
+  testLog.info({ severity: "info", tag: "test" });
+  testLog.warn({ severity: "warn", message: "test warn", tag: "test" });
+  testLog.error({ severity: "error", message: "test error", tag: "test" });
   throw new Error("test-error-for-posthog-capture");
 });
 
 app.onError(async (err, c) => {
-  captureError(err, c.env, c.executionCtx, "fetch_handler", { path: c.req.path });
+  captureError(err, c.env, c.executionCtx, "fetch_handler", "api", { path: c.req.path });
   return c.json({ error: "Internal error" }, 500);
 });
 
@@ -51,7 +54,7 @@ async function wrapFetch(request: Request, env: Env, ctx: ExecutionContext) {
   try {
     return await app.fetch(request, env, ctx);
   } catch (err) {
-    captureError(err, env, ctx, "fetch_entry");
+    captureError(err, env, ctx, "fetch_entry", "api");
     return new Response("Internal error", { status: 500 });
   }
 }
@@ -60,7 +63,7 @@ async function wrapScheduled(event: ScheduledController, env: Env, ctx: Executio
   try {
     await scheduled(event, env as any, ctx as any);
   } catch (err) {
-    captureError(err, env, ctx, "scheduled");
+    captureError(err, env, ctx, "scheduled", "cron");
   }
 }
 
@@ -68,7 +71,7 @@ async function wrapEmail(message: ForwardableEmailMessage, env: Env, ctx: Execut
   try {
     await email(message, env as any, ctx as any);
   } catch (err) {
-    captureError(err, env, ctx, "email_entry");
+    captureError(err, env, ctx, "email_entry", "email");
   }
 }
 

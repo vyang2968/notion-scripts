@@ -1,13 +1,16 @@
 import { Context } from "hono";
 import { createPosthogClient } from "../../posthog";
+import { createLogger } from "../../lib/logger";
 import { getWebhookEventType, verifyWebhook } from "./utils";
+
+const log = createLogger("meal-planner");
 
 async function handlePopulateWebhookEvent() {}
 
 export async function handle(c: Context) {
   const posthog = createPosthogClient(c.env);
 
-  console.log({ service: "meal-planner", event: "webhook_received" });
+  log.log({ event: "webhook_received" });
 
   const isVerified = await verifyWebhook(c);
   if (!isVerified) {
@@ -24,10 +27,10 @@ export async function handle(c: Context) {
             await handlePopulateWebhookEvent();
             break;
           default:
-            console.log({ service: "meal-planner", event: "unknown_event_type", type: webhookEventType });
+            log.log({ event: "unknown_event_type", type: webhookEventType });
         }
       } catch (error) {
-        console.error({ service: "meal-planner", event: "background_event_failed", error: String(error) });
+        log.error({ event: "background_event_failed", error: String(error) });
         posthog?.captureException(error, "webhook", { source: "webhook_background" });
       }
     })(),
