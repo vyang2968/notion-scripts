@@ -67,9 +67,17 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
 }
 
 const MAX_EMAIL_BODY_LENGTH = 2000;
+const TRUNCATION_SUFFIX = "\n\n— truncated —";
+
+function truncateEmailBody(emailBody: string) {
+  const chars = Array.from(emailBody);
+  const maxBody = MAX_EMAIL_BODY_LENGTH - Array.from(TRUNCATION_SUFFIX).length;
+  if (chars.length <= maxBody) return emailBody;
+  return chars.slice(0, maxBody).join("") + TRUNCATION_SUFFIX;
+}
 
 function buildCorrespondenceBlocks(emailBody: string, emailSubject: string, date: string) {
-  const body = emailBody.length > MAX_EMAIL_BODY_LENGTH ? emailBody.slice(0, MAX_EMAIL_BODY_LENGTH) + "\n\n— truncated —" : emailBody;
+  const body = truncateEmailBody(emailBody);
 
   return [
     {
