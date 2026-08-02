@@ -6,6 +6,7 @@ import { handle } from "./webhooks/meal-planner";
 import { email, testAiExtraction } from "./email";
 import { createPosthogClient } from "./posthog";
 import { createLogger } from "./lib/logger";
+import { buildOtlpPayload, sendOtlpLog, type OtlpLogLevel } from "./lib/otlp-logs";
 
 type Env = {
   AI: { run: (model: string, input: any) => Promise<any> };
@@ -43,6 +44,24 @@ app.get("/api/v1/test/logs", async (c) => {
   testLog.warn({ severity: "warn", message: "test warn", tag: "test" });
   testLog.error({ severity: "error", message: "test error", tag: "test" });
   throw new Error("test-error-for-posthog-capture");
+});
+
+app.get("/api/v1/test/otlp", async (c) => {
+  const host = (c.env.POSTHOG_HOST || "https://us.i.posthog.com").replace(/\/$/, "");
+  const levels: OtlpLogLevel[] = ["debug", "info", "warn", "error"];
+  const results = [];
+  for (const level of levels) {
+    const result = await sendOtlpLog(c.env, "otlp-test", level, {
+      message: "hello from otlp test route",
+      tag: "otlp-test",
+    });
+    results.push({ level, ...result });
+  }
+  return c.json({
+    endpoint: `${host}/i/v1/logs`,
+    samplePayload: buildOtlpPayload("otlp-test", "info", { message: "sample", tag: "otlp-test" }),
+    results,
+  });
 });
 
 app.onError(async (err, c) => {
