@@ -3,6 +3,7 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
+    "build": "bun run typecheck && wrangler deploy --dry-run --minify",
     "deploy": "wrangler d1 migrations apply notion-scripts-db --remote && wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
     "db:create": "wrangler d1 create notion-scripts-db",
