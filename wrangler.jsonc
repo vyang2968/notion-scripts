@@ -9,7 +9,6 @@
   "observability": {
     "logs": {
       "enabled": true,
-      "destinations": ["posthog-logs"]
     },
   },
   "compatibility_flags": [
