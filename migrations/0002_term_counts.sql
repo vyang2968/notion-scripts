@@ -1,0 +1,5 @@
+CREATE TABLE IF NOT EXISTS term_counts (
+  term TEXT PRIMARY KEY,
+  doc_count INTEGER NOT NULL DEFAULT 0,
+  term_count INTEGER NOT NULL DEFAULT 0
+);

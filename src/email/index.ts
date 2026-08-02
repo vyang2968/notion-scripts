@@ -5,7 +5,8 @@ import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
 import { createLogger } from "../lib/logger";
 import { getNotion } from "../lib/notion";
-import { syncJobApplication, recordJobApplicationEmail } from "../lib/job-applications";
+import { syncJobApplication } from "../lib/job-applications";
+import { extractTermCounts, recordTerms } from "../lib/keyword-extraction";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
@@ -152,13 +153,8 @@ export async function email(
           if (extracted.type !== "not_job_related") {
             log.log({ component: "result", event: "job_application", extracted });
 
-            await recordJobApplicationEmail(env.DB, {
-              subject: parsed.subject || "",
-              from: fromToString(parsed.from),
-              company: extracted.company,
-              position: extracted.position,
-              body: parsed.text || stripHtml(parsed.html || ""),
-            });
+            const bodyText = parsed.text || stripHtml(parsed.html || "") || "";
+            await recordTerms(env.DB, extractTermCounts(`${parsed.subject || ""} ${bodyText}`));
 
             try {
               const notion = getNotion(env);
