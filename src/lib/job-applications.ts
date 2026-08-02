@@ -37,6 +37,30 @@ function buildProperties(data: JobApplication | FollowUp) {
   };
 }
 
+function normalizeText(text: string) {
+  return text.toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function companyToken(company: string) {
+  const tokens = normalizeText(company).split(" ").filter((t) => t.length >= 3);
+  return tokens[0] ?? normalizeText(company);
+}
+
+function positionsMatch(a: string, b: string) {
+  const na = normalizeText(a);
+  const nb = normalizeText(b);
+  if (!na || !nb) return false;
+  if (na === nb) return true;
+  return na.includes(nb) || nb.includes(na);
+}
+
+function getTextProperty(page: any, key: string) {
+  const prop = page?.properties?.[key];
+  if (!prop) return "";
+  const rich = prop.type === "title" ? prop.title : prop.type === "rich_text" ? prop.rich_text : null;
+  return (rich ?? []).map((r: any) => r.plain_text ?? r.text?.content ?? "").join("");
+}
+
 function buildCompanyPositionFilter(company: string, position: string) {
   return {
     and: [
@@ -57,13 +81,26 @@ async function findExisting(notion: Client, data: JobApplication | FollowUp) {
     if (byId.results.length > 0) return byId.results[0];
   }
 
-  const byCompany = await notion.dataSources.query({
+  const exact = await notion.dataSources.query({
     data_source_id: DATA_SOURCE_ID,
     filter: buildCompanyPositionFilter(data.company, data.position),
     sorts: [{ timestamp: "created_time", direction: "descending" }],
   });
+  if (exact.results.length > 0) return exact.results[0];
 
-  return byCompany.results[0] ?? null;
+  const candidates = await notion.dataSources.query({
+    data_source_id: DATA_SOURCE_ID,
+    filter: { property: "company" as const, rich_text: { contains: companyToken(data.company) } },
+    sorts: [{ timestamp: "created_time", direction: "descending" }],
+  });
+
+  const matched = candidates.results.find(
+    (page: any) =>
+      normalizeText(getTextProperty(page, "company")) === normalizeText(data.company) &&
+      positionsMatch(getTextProperty(page, "position"), data.position),
+  );
+
+  return matched ?? null;
 }
 
 const MAX_EMAIL_BODY_LENGTH = 2000;

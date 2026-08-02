@@ -70,7 +70,13 @@ Fields:
 - applicationDate: the date from the "Sent" line in the email body, in YYYY-MM-DD format
 - contactName: only populate if a real person sent this (e.g. recruiter, hiring manager). Set to null for automated senders like noreply@, jobs@, careers@, etc.
 - contactEmail: the sender's email if a real person, otherwise null
-- status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"`;
+- status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"
+
+Consistency rules (so follow-up emails match the original application):
+- For follow-ups, return the same company and position used for the original application.
+- company: use the full, canonical company name (e.g. "Acme" → "Acme Corp"), not abbreviations.
+- position: use the full job title (e.g. "SWE" or "Engineer" → "Software Engineer"), and reuse the same title wording for the same role across emails.
+- applicationId: only populate with a real reference/ID number found in the email, otherwise null.`;
 
 export const JSON_SCHEMA = {
   type: "object",
