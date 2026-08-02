@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ExecutionContext } from "hono";
-import type { ForwardableEmailMessage, ScheduledController } from "@cloudflare/workers-types";
+import type { ForwardableEmailMessage, ScheduledController, D1Database } from "@cloudflare/workers-types";
 import { scheduled } from "./cron";
 import { handle } from "./webhooks/meal-planner";
 import { email, testAiExtraction } from "./email";
@@ -13,6 +13,7 @@ type Env = {
   POSTHOG_API_KEY?: string;
   POSTHOG_HOST?: string;
   NOTION_API_KEY?: string;
+  DB?: D1Database;
 };
 
 function captureError(err: unknown, env: Env, ctx: ExecutionContext, source: string, service: string, extra?: Record<string, unknown>) {

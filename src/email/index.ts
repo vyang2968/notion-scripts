@@ -1,15 +1,17 @@
 import PostalMime from "postal-mime";
-import type { ForwardableEmailMessage, ExecutionContext } from "@cloudflare/workers-types";
+import type { ForwardableEmailMessage, ExecutionContext, D1Database } from "@cloudflare/workers-types";
 import type { Address } from "postal-mime";
 import type { PostHog } from "posthog-node";
 import { createPosthogClient } from "../posthog";
 import { createLogger } from "../lib/logger";
 import { getNotion } from "../lib/notion";
-import { syncJobApplication } from "../lib/job-applications";
+import { syncJobApplication, recordJobApplicationEmail } from "../lib/job-applications";
 import type { AiChatResponse, ExtractionResult } from "./extract";
 import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
 const log = createLogger("email");
+
+const stripHtml = (html: string) => html.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
 
 const formatDate = (d: Date | string | undefined): string | undefined => {
   if (!d) return undefined;
@@ -121,7 +123,7 @@ HR Team`;
 
 export async function email(
   message: ForwardableEmailMessage,
-  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY?: string },
+  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY?: string; DB?: D1Database },
   ctx: ExecutionContext,
 ) {
   const emailFrom = message.from;
@@ -149,6 +151,14 @@ export async function email(
         try {
           if (extracted.type !== "not_job_related") {
             log.log({ component: "result", event: "job_application", extracted });
+
+            await recordJobApplicationEmail(env.DB, {
+              subject: parsed.subject || "",
+              from: fromToString(parsed.from),
+              company: extracted.company,
+              position: extracted.position,
+              body: parsed.text || stripHtml(parsed.html || ""),
+            });
 
             try {
               const notion = getNotion(env);

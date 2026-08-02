@@ -1,8 +1,28 @@
 import type { Client } from "@notionhq/client";
+import type { D1Database } from "@cloudflare/workers-types";
 import type { JobApplication, FollowUp, Status } from "../email/extract";
 import { createLogger } from "./logger";
 
 const log = createLogger("email");
+
+const MAX_BODY_LENGTH = 5000;
+
+export async function recordJobApplicationEmail(
+  db: D1Database | undefined,
+  data: { subject: string; from: string; company: string; position: string; body: string },
+) {
+  if (!db) return;
+  const body = data.body.length > MAX_BODY_LENGTH ? data.body.slice(0, MAX_BODY_LENGTH) : data.body;
+  try {
+    await db
+      .prepare("INSERT INTO job_applications (subject, from_email, company, position, body) VALUES (?1, ?2, ?3, ?4, ?5)")
+      .bind(data.subject, data.from, data.company, data.position, body)
+      .run();
+    log.log({ component: "d1", event: "job_application_recorded", subject: data.subject, company: data.company });
+  } catch (err) {
+    log.error({ component: "d1", event: "record_failed", error: String(err) });
+  }
+}
 
 const DATABASE_ID = "45228394-435c-83c1-867e-01e4061b8120";
 const DATA_SOURCE_ID = "a4328394-435c-8361-b84d-8775c801c09d";

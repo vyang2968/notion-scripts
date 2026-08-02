@@ -3,8 +3,11 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "wrangler deploy --minify",
+    "deploy": "wrangler d1 migrations apply notion-scripts-db --remote && wrangler deploy --minify",
     "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "db:create": "wrangler d1 create notion-scripts-db",
+    "db:migrate": "wrangler d1 migrations apply notion-scripts-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply notion-scripts-db --local",
     "typecheck": "bun --bun tsc --noEmit"
   },
   "dependencies": {

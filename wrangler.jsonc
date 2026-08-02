@@ -31,13 +31,14 @@
   //     "bucket_name": "my-bucket"
   //   }
   // ],
-  // "d1_databases": [
-  //   {
-  //     "binding": "MY_DB",
-  //     "database_name": "my-database",
-  //     "database_id": ""
-  //   }
-  // ],
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "notion-scripts-db",
+      "database_id": "dc3a1562-3031-4817-acfc-2771b431f24d"
+    }
+  ],
+  // note: run `wrangler d1 migrations apply notion-scripts-db --remote`
   "ai": {
     "binding": "AI"
   },
