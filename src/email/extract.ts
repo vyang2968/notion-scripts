@@ -49,35 +49,6 @@ export type NotJobRelated = {
 
 export type ExtractionResult = JobApplication | FollowUp | NotJobRelated;
 
-export const SYSTEM_PROMPT = `You are parsing job application emails. Determine if the email is related to a job application, then extract structured data.
-
-For a NEW job application email (application confirmation, acknowledgment):
-- type: "job_application"
-- status: infer the current stage from the email
-
-For a FOLLOW-UP email (recruiter reaching out, interview invitation, status update, rejection):
-- type: "follow_up"
-- status: infer the updated stage
-
-For anything NOT job-related (newsletters, receipts, spam, etc.):
-- type: "not_job_related"
-
-Fields:
-- from: the sender email address (always populate for job_application or follow_up)
-- company: the company name
-- position: the job title/role. Use "Unknown" if the job title cannot be determined.
-- applicationId: any reference/ID number if present, otherwise null
-- applicationDate: the date from the "Sent" line in the email body, in YYYY-MM-DD format
-- contactName: only populate if a real person sent this (e.g. recruiter, hiring manager). Set to null for automated senders like noreply@, jobs@, careers@, etc.
-- contactEmail: the sender's email if a real person, otherwise null
-- status must be exactly one of: "applied", "online assessment", "phone screen", "interviewing", "offer", "accepted", "rejected"
-
-Consistency rules (so follow-up emails match the original application):
-- For follow-ups, return the same company and position used for the original application.
-- company: use the full, canonical company name (e.g. "Acme" → "Acme Corp"), not abbreviations.
-- position: use the full job title (e.g. "SWE" or "Engineer" → "Software Engineer"), and reuse the same title wording for the same role across emails.
-- applicationId: only populate with a real reference/ID number found in the email, otherwise null.`;
-
 export const JSON_SCHEMA = {
   type: "object",
   properties: {

@@ -7,8 +7,9 @@ import { createLogger } from "../lib/logger";
 import { getNotion } from "../lib/notion";
 import { syncJobApplication } from "../lib/job-applications";
 import { extractTermCounts, recordTerms } from "../lib/keyword-extraction";
+import { compilePrompt, fetchSystemPrompt } from "../lib/ai-prompt";
 import type { AiChatResponse, ExtractionResult } from "./extract";
-import { buildPrompt, parseResponse, SYSTEM_PROMPT, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
+import { buildPrompt, parseResponse, JSON_SCHEMA, GEMINI_MODEL } from "./extract";
 
 const log = createLogger("email");
 
@@ -32,11 +33,12 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   const spanId = crypto.randomUUID();
   const prompt = buildPrompt(bodyText, subject, from, sentDate);
   const dateRef = sentDate ? `The email was sent on ${sentDate}.` : `Today's date is ${new Date().toISOString().split("T")[0]}.`;
+  const systemPrompt = compilePrompt(await fetchSystemPrompt(env), {
+    date_ref: dateRef,
+    json_schema: JSON.stringify(JSON_SCHEMA),
+  });
   const messages = [
-    {
-      role: "system",
-      content: `${dateRef}\n\n${SYSTEM_PROMPT}\n\nReturn ONLY valid JSON matching this schema, no other text:\n${JSON.stringify(JSON_SCHEMA)}`,
-    },
+    { role: "system", content: systemPrompt },
     { role: "user", content: prompt },
   ];
 
@@ -124,7 +126,7 @@ HR Team`;
 
 export async function email(
   message: ForwardableEmailMessage,
-  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; NOTION_API_KEY?: string; DB?: D1Database },
+  env: { AI: { run: (model: string, input: any) => Promise<any> }; POSTHOG_API_KEY?: string; POSTHOG_HOST?: string; POSTHOG_PERSONAL_API_KEY?: string; NOTION_API_KEY?: string; DB?: D1Database },
   ctx: ExecutionContext,
 ) {
   const emailFrom = message.from;
