@@ -18,7 +18,7 @@ const STATUS_MAP: Record<Status, string> = {
 };
 
 function buildProperties(data: JobApplication | FollowUp) {
-  const { company, position, status, applicationDate, contactName, contactEmail, from } = data;
+  const { company, position, status, applicationDate, contactName, contactEmail, from, oaDeadlineDate, interviewDate } = data;
   const applicationId = data.type === "job_application" ? data.applicationId : null;
   const title = applicationId
     ? `${company} - ${position} - ${applicationId}`
@@ -34,6 +34,8 @@ function buildProperties(data: JobApplication | FollowUp) {
     ...(applicationId ? { "application id": { rich_text: [{ text: { content: applicationId } }] } } : {}),
     ...(contactName ? { "contact name": { rich_text: [{ text: { content: contactName } }] } } : {}),
     ...(contactEmail ? { "contact email": { email: contactEmail } } : {}),
+    ...(oaDeadlineDate ? { "oa deadline date": { date: { start: oaDeadlineDate } } } : {}),
+    ...(interviewDate ? { "interview date": { date: { start: interviewDate } } } : {}),
   };
 }
 

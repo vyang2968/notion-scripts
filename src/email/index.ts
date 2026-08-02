@@ -104,6 +104,9 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   if (parsed.type !== "not_job_related" && sentDate) {
     parsed.applicationDate = sentDate;
   }
+  if (parsed.type !== "not_job_related" && parsed.status === "online assessment" && !parsed.oaDeadlineDate) {
+    parsed.oaDeadlineDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) ?? null;
+  }
   return parsed;
 }
 

@@ -30,6 +30,8 @@ export type JobApplication = {
   contactName: string | null;
   contactEmail: string | null;
   applicationDate: string;
+  oaDeadlineDate: string | null;
+  interviewDate: string | null;
 };
 
 export type FollowUp = {
@@ -41,6 +43,8 @@ export type FollowUp = {
   contactName: string | null;
   contactEmail: string | null;
   applicationDate: string;
+  oaDeadlineDate: string | null;
+  interviewDate: string | null;
 };
 
 export type NotJobRelated = {
@@ -67,6 +71,8 @@ export const JSON_SCHEMA = {
     contactName: { type: ["string", "null"] },
     contactEmail: { type: ["string", "null"] },
     applicationDate: { type: "string" },
+    oaDeadlineDate: { type: ["string", "null"] },
+    interviewDate: { type: ["string", "null"] },
   },
   required: ["type"],
 };
