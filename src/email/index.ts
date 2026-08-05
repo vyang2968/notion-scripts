@@ -78,6 +78,14 @@ async function extract(bodyText: string, subject: string, from: string, env: any
   const raw = aiResponse.response ?? aiChoice?.message?.content;
   log.log({ component: "ai", event: "raw_response", type: typeof raw, preview: raw?.slice?.(0, 300) });
 
+  const parsed = parseResponse(raw) as ExtractionResult;
+  if (parsed.type !== "not_job_related" && sentDate) {
+    parsed.applicationDate = sentDate;
+  }
+  if (parsed.type !== "not_job_related" && parsed.status === "online assessment" && !parsed.oaDeadlineDate) {
+    parsed.oaDeadlineDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) ?? null;
+  }
+
   if (posthog) {
     const usage = aiResponse.usage;
     posthog.captureImmediate({
@@ -96,17 +104,20 @@ async function extract(bodyText: string, subject: string, from: string, env: any
         $ai_latency: latencyMs / 1000,
         $ai_stop_reason: aiChoice?.finish_reason ?? null,
         $ai_stream: false,
+        job_related: parsed.type !== "not_job_related",
+        ai_result_type: parsed.type,
+        ...(parsed.type !== "not_job_related"
+          ? {
+              ai_company: parsed.company,
+              ai_position: parsed.position,
+              ai_status: parsed.status,
+              ai_application_date: parsed.applicationDate,
+            }
+          : {}),
       },
     });
   }
 
-  const parsed = parseResponse(raw) as ExtractionResult;
-  if (parsed.type !== "not_job_related" && sentDate) {
-    parsed.applicationDate = sentDate;
-  }
-  if (parsed.type !== "not_job_related" && parsed.status === "online assessment" && !parsed.oaDeadlineDate) {
-    parsed.oaDeadlineDate = formatDate(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)) ?? null;
-  }
   return parsed;
 }
 
